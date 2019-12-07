@@ -37,7 +37,7 @@
 // Bank button at pin 0
 // Bank LED at pin 3
 
-#include "MIDIUSB.h"
+#include "usbmidi.h"
 
 int NullPattern[12][32] = {
 {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
@@ -56,17 +56,17 @@ int NullPattern[12][32] = {
 
 // For testing:
 int Pattern[12][32] = {
-{HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
+{HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW,},
 {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
-{LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, HIGH, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
 {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
-{LOW, LOW, HIGH, HIGH, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
 {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
-{HIGH, HIGH, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
 {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
-{LOW, LOW, LOW, HIGH, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
 {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
-{HIGH, HIGH, HIGH, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
+{LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
+{LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
+{LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
+{LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
+{LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
 {LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW,},
 };
 
@@ -144,21 +144,23 @@ void StateNoteSend(int truth, byte pitch, int channel) {
   } else if(truth == LOW){
     noteOff(channel, pitch, 0);
   }
+  USBMIDI.flush();
 }
 
-void noteOn(byte channel, byte pitch, byte velocity) {
-  midiEventPacket_t noteOn = {0x09, 0x90 | channel, pitch, velocity};
-  MidiUSB.sendMIDI(noteOn);
+void noteOn(uint8_t channel, uint8_t pitch, uint8_t velocity) {
+  USBMIDI.write(0x90 | (channel & 0xf));
+  USBMIDI.write(pitch & 0x7f);
+  USBMIDI.write(velocity & 0x7f);
 }
 
 void noteOff(byte channel, byte pitch, byte velocity) {
-  midiEventPacket_t noteOff = {0x08, 0x80 | channel, pitch, velocity};
-  MidiUSB.sendMIDI(noteOff);
+  USBMIDI.write(0x80 | (channel & 0xf));
+  USBMIDI.write(pitch & 0x7f);
+  USBMIDI.write(velocity & 0x7f);
 }
 
 void setup()
 {
-  Serial.begin(115200);
   SpeedState = analogRead(SpeedSelect);
   PatternState = analogRead(PatternSelect);
   ChannelState = analogRead(ChannelSelect);
@@ -260,10 +262,13 @@ void setup()
 
 }
 
-midiEventPacket_t clk;
+u8 clk;
 
 void loop() {
-  clk = MidiUSB.read();
+  USBMIDI.poll();
+
+  clk = USBMIDI.read();
+    
   SpeedState = analogRead(SpeedSelect);
   PatternState = analogRead(PatternSelect);
   ChannelState = analogRead(ChannelSelect);
@@ -291,7 +296,7 @@ void loop() {
   }
 
   //Count pulses
-  if(clk.byte1 == 0xF8){
+  if(clk == 0xF8){
      PC++;
      
      if(PC == Steps) {
@@ -300,14 +305,14 @@ void loop() {
      }
   }
   //Clock start byte
-  else if(clk.byte1 == 0xFA){
+  else if(clk == 0xFA){
     RUN = HIGH;
     ADVANCE = HIGH;
     PC = 0;
     POS = 0;
   }
   //Clock stop byte
-  else if(clk.byte1 == 0xFC){
+  else if(clk == 0xFC){
     RUN = LOW;
     PC = 0;
     POS = 0;
@@ -316,7 +321,6 @@ void loop() {
   if(RUN == HIGH && ADVANCE == HIGH) {
     for(int it = 0; it < 6; it++){
       StateNoteSend(Pattern[2*it + bank][POS] || Fill[2*it], Pitch + it, ChannelChannels[it]);
-      MidiUSB.flush();
       digitalWrite(Outs[it], Pattern[2*it + bank][POS] || Fill[2*it]);
     }
     ADVANCE = LOW;
@@ -327,7 +331,7 @@ void loop() {
       noteOff(0, Pitch + it, 0);
       digitalWrite(Outs[it], LOW);
     }
-    MidiUSB.flush();
+    USBMIDI.flush();
     ADVANCE = LOW;
   }
   // Select speed
