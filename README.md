@@ -1,4 +1,8 @@
 # (USB-)MIDI big button
+
+**Update regarding issue #1**  
+The code here has only been tested on an arduino micro. It appears it doesn't work on a nano, due to different usb capabilities. It should be possible to use the serial connection and a MIDI jack to port the code for a nano. However, nothing of this has been tested and you may have to use a different MIDI library.
+
 Code for a MIDI version of the big button from lookmumnocomputer.
 
 The original version can be found here:
